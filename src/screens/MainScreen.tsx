@@ -15,7 +15,7 @@ import namesData from '../data/names.json';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const CARD_W = Math.min(SCREEN_W - 40, 400);
-const CARD_H = Math.min(SCREEN_H * 0.65, 560);
+const CARD_H = Math.min(SCREEN_H * 0.55, 480);
 const SWIPE_THRESHOLD = 100;
 
 const C = {
@@ -294,7 +294,7 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
 
 // ── Browse tab ────────────────────────────────────────────────────────────────
 
-function BrowseTab({ liked, setLiked }: { liked: Name[]; setLiked: React.Dispatch<React.SetStateAction<Name[]>> }) {
+function BrowseTab({ liked, setLiked, tabBarHeight }: { liked: Name[]; setLiked: React.Dispatch<React.SetStateAction<Name[]>>; tabBarHeight: number }) {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [seen, setSeen] = useState<Set<string>>(new Set());
@@ -337,8 +337,8 @@ function BrowseTab({ liked, setLiked }: { liked: Name[]; setLiked: React.Dispatc
   }
 
   return (
-    <View style={{ flex: 1, flexDirection: 'column' }}>
-      {/* Filter toggle */}
+    <View style={{ flex: 1, paddingBottom: tabBarHeight }}>
+      {/* Filter toggle — fixed height */}
       <View style={styles.filterToggleRow}>
         <TouchableOpacity style={styles.filterToggle} onPress={() => setFiltersOpen(o => !o)}>
           <Text style={styles.filterToggleText}>
@@ -356,17 +356,17 @@ function BrowseTab({ liked, setLiked }: { liked: Name[]; setLiked: React.Dispatc
         <FilterPanel filters={filters} onChange={(f) => { setFilters(f); setSeen(new Set()); setCardKey(k => k + 1); }} />
       )}
 
-      {/* Card + buttons — fills all remaining space */}
-      <View style={styles.cardArea}>
+      {/* Card + buttons — centred in remaining space */}
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         {current ? (
           <>
-            {/* Explicit-height wrapper so absolute-positioned cards have a parent with size */}
-            <View style={styles.cardStack}>
+            {/* Explicit-height card stack so absolute children have a sized parent */}
+            <View style={{ width: CARD_W, height: CARD_H, position: 'relative' }}>
               {next && <View style={[styles.card, styles.cardBehind]} />}
               <NameCard key={cardKey} item={current} onLike={handleLike} onSkip={handleSkip} />
             </View>
-            {/* Action buttons anchored directly below the card */}
-            <View style={styles.actionRow}>
+            {/* Action buttons sit directly below the card */}
+            <View style={[styles.actionRow, { marginTop: 12 }]}>
               <TouchableOpacity style={[styles.actionBtn, styles.skipBtn]} onPress={handleSkip}>
                 <Text style={styles.skipBtnText}>✕ Skip</Text>
               </TouchableOpacity>
@@ -485,6 +485,7 @@ export default function MainScreen() {
   const [tab, setTab] = useState<'browse' | 'liked' | 'partner'>('browse');
   const [liked, setLiked] = useState<Name[]>([]);
   const insets = useSafeAreaInsets();
+  const tabBarHeight = 60 + insets.bottom;
 
   return (
     <View style={styles.root}>
@@ -496,13 +497,13 @@ export default function MainScreen() {
 
       {/* Content */}
       <View style={{ flex: 1 }}>
-        {tab === 'browse' && <BrowseTab liked={liked} setLiked={setLiked} />}
+        {tab === 'browse' && <BrowseTab liked={liked} setLiked={setLiked} tabBarHeight={tabBarHeight} />}
         {tab === 'liked' && <LikedTab liked={liked} setLiked={setLiked} />}
         {tab === 'partner' && <PartnerTab liked={liked} />}
       </View>
 
-      {/* Tab bar */}
-      <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+      {/* Tab bar — fixed height = 60 + bottom inset */}
+      <View style={[styles.tabBar, { height: tabBarHeight, paddingBottom: insets.bottom }]}>
         {(['browse', 'liked', 'partner'] as const).map(t => {
           const active = tab === t;
           const label = t === 'browse' ? '🔍 Browse' : t === 'liked' ? `♥ Liked${liked.length ? ` (${liked.length})` : ''}` : '💑 Partner';
