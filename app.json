@@ -2,7 +2,7 @@
   "expo": {
     "name": "Baby Name Finder",
     "slug": "baby-name-finder",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "platforms": ["web"],
     "web": {
       "bundler": "metro",
