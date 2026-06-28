@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import namesData from '../data/names.json';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -483,6 +484,7 @@ function PartnerTab({ liked }: { liked: Name[] }) {
 export default function MainScreen() {
   const [tab, setTab] = useState<'browse' | 'liked' | 'partner'>('browse');
   const [liked, setLiked] = useState<Name[]>([]);
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.root}>
@@ -500,7 +502,7 @@ export default function MainScreen() {
       </View>
 
       {/* Tab bar */}
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         {(['browse', 'liked', 'partner'] as const).map(t => {
           const active = tab === t;
           const label = t === 'browse' ? '🔍 Browse' : t === 'liked' ? `♥ Liked${liked.length ? ` (${liked.length})` : ''}` : '💑 Partner';
@@ -632,7 +634,7 @@ const styles = StyleSheet.create({
   partnerCode: { fontSize: 42, fontWeight: '900', color: C.purple, letterSpacing: 6, marginBottom: 8 },
   partnerCodeHint: { fontSize: 13, color: C.muted, textAlign: 'center' },
 
-  tabBar: { flexDirection: 'row', backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.border, paddingBottom: 20 },
+  tabBar: { flexDirection: 'row', backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.border },
   tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center' },
   tabBtnActive: { borderTopWidth: 2, borderTopColor: C.purple },
   tabLabel: { fontSize: 13, color: C.muted, fontWeight: '500' },
