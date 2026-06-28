@@ -53,6 +53,40 @@ const ORIGINS = ['English', 'Irish', 'Welsh', 'Scottish', 'Latin', 'Greek', 'Heb
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 const BAD_INITIALS = ['ASS', 'FAT', 'PIG', 'DIE', 'BUM', 'STD', 'HIV', 'POO', 'WTF', 'FUK', 'DUM', 'SHT', 'EFF', 'SOD'];
 
+const VIBE_COLORS: Record<string, string> = {
+  Classic: '#C4956A', Modern: '#7BA7BC', Vintage: '#B08060', Nature: '#6A9C72',
+  Bold: '#E07060', Celestial: '#5E72A0', Mythic: '#8B5E8C', Celtic: '#4A7C5F',
+  Nordic: '#6B7FA8', Elegant: '#C49090', Playful: '#E89C6A', Quirky: '#C47AB8',
+  Biblical: '#8B7355', Whimsical: '#E09DB8', Timeless: '#8B8B70', Royal: '#6B5EA0',
+  Spiritual: '#9B8B70', Romantic: '#E07898', Mysterious: '#5E5E8C',
+};
+
+const STYLE_COMBO: Record<string, string> = {
+  'Classic Romantic': 'Classic Romantic', 'Classic Timeless': 'Timeless Classic',
+  'Classic Elegant': 'Classic Elegant', 'Classic Biblical': 'Traditional Classic',
+  'Modern Bold': 'Bold & Modern', 'Modern Playful': 'Modern Playful',
+  'Nature Whimsical': 'Nature Whimsical', 'Nature Celtic': 'Wild & Celtic',
+  'Bold Mythic': 'Bold Mythic', 'Celtic Nordic': 'Nordic Celtic',
+  'Celestial Mysterious': 'Celestial Mysterious', 'Royal Elegant': 'Royal Elegant',
+};
+
+function computeStyle(liked: Name[]) {
+  const vibeCounts: Record<string, number> = {};
+  const originCounts: Record<string, number> = {};
+  for (const n of liked) {
+    for (const v of n.vibes) vibeCounts[v] = (vibeCounts[v] || 0) + 1;
+    originCounts[n.origin] = (originCounts[n.origin] || 0) + 1;
+  }
+  const topVibes = Object.entries(vibeCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([v]) => v);
+  const topOrigins = Object.entries(originCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([o]) => o);
+  const [v1 = '', v2 = ''] = topVibes;
+  const comboKey = `${v1} ${v2}`;
+  const reverseKey = `${v2} ${v1}`;
+  const title = STYLE_COMBO[comboKey] || STYLE_COMBO[reverseKey] || (v1 && v2 ? `${v1} ${v2}` : v1 || 'Explorer');
+  const color = VIBE_COLORS[v1] || C.purple;
+  return { title, vibes: topVibes, origins: topOrigins, color };
+}
+
 function speak(text: string) {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel();
@@ -92,12 +126,7 @@ function genderLabel(g: string) {
 }
 
 type Filters = {
-  gender: string;
-  letter: string;
-  origin: string;
-  vibe: string;
-  syllables: number;
-  trend: string;
+  gender: string; letter: string; origin: string; vibe: string; syllables: number; trend: string;
 };
 
 const DEFAULT_FILTERS: Filters = { gender: 'All', letter: '', origin: '', vibe: '', syllables: 0, trend: '' };
@@ -115,31 +144,147 @@ function applyFilters(names: Name[], filters: Filters, seen: Set<string>): Name[
   });
 }
 
+// ── Taste Profile Modal ───────────────────────────────────────────────────────
+
+function TasteProfileModal({
+  liked, likeCount, skipCount, onClose,
+}: {
+  liked: Name[];
+  likeCount: number;
+  skipCount: number;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const profile = useMemo(() => computeStyle(liked), [liked]);
+  const swatch = profile.color;
+
+  async function handleShare() {
+    const text = `My baby name style is "${profile.title}" ✨\nTop vibes: ${profile.vibes.join(', ')}\nTop origins: ${profile.origins.join(', ')}\n${likeCount} liked · ${skipCount} skipped`;
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      } catch { /* silent fail */ }
+    }
+  }
+
+  return (
+    <View style={tp.overlay}>
+      <View style={[tp.sheet, { borderTopColor: swatch }]}>
+        <TouchableOpacity onPress={onClose} style={tp.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Text style={tp.closeBtnText}>✕</Text>
+        </TouchableOpacity>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingBottom: 40 }}>
+          <Text style={tp.eyebrow}>YOUR NAME STYLE</Text>
+          <Text style={[tp.styleTitle, { color: swatch }]}>{profile.title}</Text>
+
+          {/* Palette swatch row */}
+          <View style={tp.swatchRow}>
+            {profile.vibes.slice(0, 3).map(v => (
+              <View key={v} style={[tp.swatch, { backgroundColor: VIBE_COLORS[v] || C.muted }]}>
+                <Text style={tp.swatchLabel}>{v}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Stats */}
+          <View style={tp.statsRow}>
+            <View style={tp.stat}>
+              <Text style={tp.statNum}>{likeCount}</Text>
+              <Text style={tp.statLabel}>Liked</Text>
+            </View>
+            <View style={[tp.stat, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: C.border }]}>
+              <Text style={tp.statNum}>{skipCount}</Text>
+              <Text style={tp.statLabel}>Skipped</Text>
+            </View>
+            <View style={tp.stat}>
+              <Text style={tp.statNum}>{likeCount + skipCount}</Text>
+              <Text style={tp.statLabel}>Total</Text>
+            </View>
+          </View>
+
+          {/* Top vibes */}
+          {profile.vibes.length > 0 && (
+            <View style={tp.section}>
+              <Text style={tp.sectionLabel}>TOP VIBES</Text>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
+                {profile.vibes.map((v, i) => (
+                  <View key={v} style={[tp.vibePill, { backgroundColor: VIBE_COLORS[v] || C.muted }]}>
+                    <Text style={tp.vibePillText}>{i === 0 ? '★ ' : ''}{v}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Top origins */}
+          {profile.origins.length > 0 && (
+            <View style={tp.section}>
+              <Text style={tp.sectionLabel}>TOP ORIGINS</Text>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
+                {profile.origins.map(o => (
+                  <View key={o} style={[tp.originPill]}>
+                    <Text style={tp.originPillText}>{o}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Share */}
+          <TouchableOpacity style={[tp.shareBtn, { backgroundColor: swatch }]} onPress={handleShare}>
+            <Text style={tp.shareBtnText}>{copied ? '✓ Copied to clipboard!' : '📤 Share my style'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
+const tp = StyleSheet.create({
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 100, justifyContent: 'flex-end' },
+  sheet: { backgroundColor: C.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderTopWidth: 4, maxHeight: SCREEN_H * 0.9, padding: 24, paddingTop: 20 },
+  closeBtn: { alignSelf: 'flex-end', width: 32, height: 32, borderRadius: 16, backgroundColor: C.lavender, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  closeBtnText: { fontSize: 14, color: C.purple, fontWeight: '700' },
+  eyebrow: { fontSize: 11, fontWeight: '700', color: C.muted, letterSpacing: 1.5, marginBottom: 8 },
+  styleTitle: { fontSize: 36, fontWeight: '900', textAlign: 'center', letterSpacing: -0.5, marginBottom: 20 },
+  swatchRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  swatch: { width: 56, height: 56, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  swatchLabel: { fontSize: 9, color: '#fff', fontWeight: '700', textAlign: 'center' },
+  statsRow: { flexDirection: 'row', backgroundColor: C.card, borderRadius: 16, width: '100%', marginBottom: 20 },
+  stat: { flex: 1, paddingVertical: 16, alignItems: 'center' },
+  statNum: { fontSize: 28, fontWeight: '900', color: C.purple },
+  statLabel: { fontSize: 11, color: C.muted, fontWeight: '600', marginTop: 2 },
+  section: { width: '100%', marginBottom: 16, alignItems: 'center' },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: C.muted, letterSpacing: 1.2 },
+  vibePill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  vibePillText: { fontSize: 13, color: '#fff', fontWeight: '700' },
+  originPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: C.lavender },
+  originPillText: { fontSize: 13, color: C.purple, fontWeight: '600' },
+  shareBtn: { marginTop: 12, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 28 },
+  shareBtnText: { fontSize: 15, color: '#fff', fontWeight: '700' },
+});
+
 // ── Reality Check Modal ───────────────────────────────────────────────────────
 
 function RealityCheckModal({
   name, surname, onChangeSurname, onClose,
 }: {
-  name: Name;
-  surname: string;
-  onChangeSurname: (s: string) => void;
-  onClose: () => void;
+  name: Name; surname: string; onChangeSurname: (s: string) => void; onClose: () => void;
 }) {
   const fullName = surname ? `${name.name} ${surname}` : name.name;
-
   const firstInitial = name.name[0].toUpperCase();
   const lastInitial = surname ? surname[0].toUpperCase() : '';
   const initials = `${firstInitial}${lastInitial}`;
-  const initialsFlag = surname.length > 0 && BAD_INITIALS.some(b => b === initials || b.startsWith(initials) && b.length === initials.length);
-
+  const initialsFlag = surname.length > 0 && BAD_INITIALS.some(b => b === initials);
   const firstSyl = name.syllables;
   const lastSyl = surname ? countSyllables(surname) : 0;
   const rhymeRisk = surname.length > 0 && firstSyl === 1 && lastSyl === 1;
-
   const firstEnds = name.name[name.name.length - 1].toLowerCase();
   const lastStarts = surname ? surname[0].toLowerCase() : '';
   const endingClash = surname.length > 0 && firstEnds === lastStarts;
-
   const [badNicknames, setBadNicknames] = useState<string[]>([]);
 
   return (
@@ -151,17 +296,13 @@ function RealityCheckModal({
             <Text style={rc.closeBtnText}>✕</Text>
           </TouchableOpacity>
         </View>
-
         <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-          {/* Full name preview */}
           <View style={rc.namePreview}>
             <Text style={rc.namePreviewText}>{fullName}</Text>
             <TouchableOpacity onPress={() => speak(fullName)} style={rc.speakBtn}>
               <Text style={rc.speakBtnText}>🔊 Hear it</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Surname input */}
           <Text style={rc.label}>Surname</Text>
           <TextInput
             style={rc.input}
@@ -172,78 +313,46 @@ function RealityCheckModal({
             autoCapitalize="words"
             returnKeyType="done"
           />
-
           <Text style={rc.sectionHeader}>Checks</Text>
-
-          {/* Initials */}
           <View style={rc.checkCard}>
             <Text style={rc.checkIcon}>{initialsFlag ? '⚠️' : '✅'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={rc.checkTitle}>Initials: {initials || firstInitial}</Text>
-              <Text style={rc.checkDesc}>
-                {initialsFlag ? `"${initials}" could raise eyebrows` : 'No awkward initials spotted'}
-              </Text>
+              <Text style={rc.checkDesc}>{initialsFlag ? `"${initials}" could raise eyebrows` : 'No awkward initials spotted'}</Text>
             </View>
           </View>
-
-          {/* Rhythm */}
           {surname.length > 0 && (
             <View style={rc.checkCard}>
               <Text style={rc.checkIcon}>{rhymeRisk ? '⚠️' : '✅'}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={rc.checkTitle}>Rhythm: {firstSyl} + {lastSyl} syllables</Text>
-                <Text style={rc.checkDesc}>
-                  {rhymeRisk
-                    ? 'Both one syllable — may sound choppy or rhyme-y (like Mark Clark)'
-                    : 'Good syllable variety'}
-                </Text>
+                <Text style={rc.checkDesc}>{rhymeRisk ? 'Both one syllable — may rhyme (like Mark Clark)' : 'Good syllable variety'}</Text>
               </View>
             </View>
           )}
-
-          {/* Ending clash */}
           {surname.length > 0 && (
             <View style={rc.checkCard}>
               <Text style={rc.checkIcon}>{endingClash ? '⚠️' : '✅'}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={rc.checkTitle}>Sound flow</Text>
-                <Text style={rc.checkDesc}>
-                  {endingClash
-                    ? `"${name.name}" ends with "${firstEnds.toUpperCase()}" and surname starts with "${lastStarts.toUpperCase()}" — can blur together when spoken quickly`
-                    : 'First and last names flow cleanly into each other'}
-                </Text>
+                <Text style={rc.checkDesc}>{endingClash ? `Ends with "${firstEnds.toUpperCase()}", surname starts "${lastStarts.toUpperCase()}" — can blur` : 'Names flow cleanly together'}</Text>
               </View>
             </View>
           )}
-
-          {/* Nickname risk */}
           {name.nicknames.length > 0 && (
             <View style={{ marginTop: 8 }}>
               <Text style={rc.sectionHeader}>Nickname check</Text>
               <Text style={rc.checkDesc}>Tap any nickname you'd want to avoid:</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                 {name.nicknames.map(nick => (
-                  <TouchableOpacity
-                    key={nick}
-                    onPress={() => setBadNicknames(f =>
-                      f.includes(nick) ? f.filter(n => n !== nick) : [...f, nick]
-                    )}
-                    style={[rc.nickChip, badNicknames.includes(nick) && rc.nickChipBad]}
-                  >
-                    <Text style={[rc.nickChipText, badNicknames.includes(nick) && { color: '#E57373' }]}>
-                      {nick}
-                    </Text>
+                  <TouchableOpacity key={nick} onPress={() => setBadNicknames(f => f.includes(nick) ? f.filter(n => n !== nick) : [...f, nick])} style={[rc.nickChip, badNicknames.includes(nick) && rc.nickChipBad]}>
+                    <Text style={[rc.nickChipText, badNicknames.includes(nick) && { color: '#E57373' }]}>{nick}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              {badNicknames.length > 0 && (
-                <Text style={{ color: '#E57373', fontSize: 12, marginTop: 6 }}>
-                  ⚠️ Flagged: {badNicknames.join(', ')}
-                </Text>
-              )}
+              {badNicknames.length > 0 && <Text style={{ color: '#E57373', fontSize: 12, marginTop: 6 }}>⚠️ Flagged: {badNicknames.join(', ')}</Text>}
             </View>
           )}
-
           <View style={{ height: 32 }} />
         </ScrollView>
       </View>
@@ -252,16 +361,8 @@ function RealityCheckModal({
 }
 
 const rc = StyleSheet.create({
-  overlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 100,
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: C.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    maxHeight: SCREEN_H * 0.85, padding: 24, paddingBottom: 40,
-    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, elevation: 12,
-  },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 100, justifyContent: 'flex-end' },
+  sheet: { backgroundColor: C.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: SCREEN_H * 0.85, padding: 24, paddingBottom: 40 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   sheetTitle: { fontSize: 22, fontWeight: '800', color: C.purple },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.lavender, alignItems: 'center', justifyContent: 'center' },
@@ -271,11 +372,7 @@ const rc = StyleSheet.create({
   speakBtn: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: C.lavender, borderRadius: 20 },
   speakBtnText: { fontSize: 13, color: C.purple, fontWeight: '600' },
   label: { fontSize: 11, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 },
-  input: {
-    borderWidth: 1.5, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: 16, color: C.text, backgroundColor: C.card, marginBottom: 20,
-    outlineStyle: 'none',
-  } as any,
+  input: { borderWidth: 1.5, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 16, color: C.text, backgroundColor: C.card, marginBottom: 20, outlineStyle: 'none' } as any,
   sectionHeader: { fontSize: 11, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
   checkCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: C.card, borderRadius: 14, padding: 14, marginBottom: 8 },
   checkIcon: { fontSize: 22 },
@@ -293,7 +390,6 @@ function NameCard({ item, onLike, onSkip }: { item: Name; onLike: () => void; on
   const rotate = pan.x.interpolate({ inputRange: [-CARD_W, 0, CARD_W], outputRange: ['-18deg', '0deg', '18deg'] });
   const likeOpacity = pan.x.interpolate({ inputRange: [0, SWIPE_THRESHOLD / 2], outputRange: [0, 1], extrapolate: 'clamp' });
   const skipOpacity = pan.x.interpolate({ inputRange: [-SWIPE_THRESHOLD / 2, 0], outputRange: [1, 0], extrapolate: 'clamp' });
-
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -310,70 +406,33 @@ function NameCard({ item, onLike, onSkip }: { item: Name; onLike: () => void; on
     })
   ).current;
 
-  const ukRank = item.popularity.uk;
-
   return (
-    <Animated.View
-      {...panResponder.panHandlers}
-      style={[styles.card, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }] }]}
-    >
-      <Animated.View style={[styles.swipeLabel, styles.likeLabel, { opacity: likeOpacity }]}>
-        <Text style={styles.swipeLabelText}>LIKE</Text>
-      </Animated.View>
-      <Animated.View style={[styles.swipeLabel, styles.skipLabel, { opacity: skipOpacity }]}>
-        <Text style={styles.swipeLabelText}>SKIP</Text>
-      </Animated.View>
-
+    <Animated.View {...panResponder.panHandlers} style={[styles.card, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }] }]}>
+      <Animated.View style={[styles.swipeLabel, styles.likeLabel, { opacity: likeOpacity }]}><Text style={styles.swipeLabelText}>LIKE</Text></Animated.View>
+      <Animated.View style={[styles.swipeLabel, styles.skipLabel, { opacity: skipOpacity }]}><Text style={styles.swipeLabelText}>SKIP</Text></Animated.View>
       <View style={{ alignItems: 'center', marginBottom: 8 }}>
         <Text style={styles.cardName}>{item.name}</Text>
         <Text style={styles.cardPronounce}>/{item.name.toLowerCase()}/</Text>
       </View>
-
       <View style={styles.badgeRow}>
-        <View style={[styles.badge, { backgroundColor: genderColor(item.gender) }]}>
-          <Text style={styles.badgeText}>{genderLabel(item.gender)}</Text>
-        </View>
-        <View style={[styles.badge, { backgroundColor: C.yellow }]}>
-          <Text style={styles.badgeText}>{item.syllables} syl</Text>
-        </View>
-        <View style={[styles.badge, { backgroundColor: C.lavender }]}>
-          <Text style={[styles.badgeText, { color: C.purple }]}>{item.origin}</Text>
-        </View>
-        <View style={[styles.badge, { backgroundColor: item.trend === 'rising' ? '#C8E6C9' : '#FFE0B2' }]}>
-          <Text style={styles.badgeText}>{item.trend === 'rising' ? 'Trending' : 'Classic'}</Text>
-        </View>
+        <View style={[styles.badge, { backgroundColor: genderColor(item.gender) }]}><Text style={styles.badgeText}>{genderLabel(item.gender)}</Text></View>
+        <View style={[styles.badge, { backgroundColor: C.yellow }]}><Text style={styles.badgeText}>{item.syllables} syl</Text></View>
+        <View style={[styles.badge, { backgroundColor: C.lavender }]}><Text style={[styles.badgeText, { color: C.purple }]}>{item.origin}</Text></View>
+        <View style={[styles.badge, { backgroundColor: item.trend === 'rising' ? '#C8E6C9' : '#FFE0B2' }]}><Text style={styles.badgeText}>{item.trend === 'rising' ? 'Trending' : 'Classic'}</Text></View>
       </View>
-
-      <View style={styles.meaningBox}>
-        <Text style={styles.meaningText}>"{item.meaning}"</Text>
-      </View>
-
+      <View style={styles.meaningBox}><Text style={styles.meaningText}>"{item.meaning}"</Text></View>
       <View style={styles.badgeRow}>
         {item.vibes.slice(0, 3).map(v => (
-          <View key={v} style={[styles.badge, { backgroundColor: C.peach }]}>
-            <Text style={[styles.badgeText, { color: C.pink }]}>{v}</Text>
-          </View>
+          <View key={v} style={[styles.badge, { backgroundColor: C.peach }]}><Text style={[styles.badgeText, { color: C.pink }]}>{v}</Text></View>
         ))}
       </View>
-
-      {item.famous.length > 0 && (
-        <Text style={styles.famousText} numberOfLines={2}>
-          Famous: {item.famous.slice(0, 2).join(' · ')}
-        </Text>
-      )}
-
-      {item.nicknames.length > 0 && (
-        <Text style={styles.nicknameText}>Also: {item.nicknames.join(', ')}</Text>
-      )}
-
+      {item.famous.length > 0 && <Text style={styles.famousText} numberOfLines={2}>Famous: {item.famous.slice(0, 2).join(' · ')}</Text>}
+      {item.nicknames.length > 0 && <Text style={styles.nicknameText}>Also: {item.nicknames.join(', ')}</Text>}
       <View style={styles.popularityRow}>
-        <Text style={styles.popularityLabel}>UK rank #{ukRank}</Text>
-        <Text style={styles.popularityLabel}>{popularityLabel(ukRank)}</Text>
+        <Text style={styles.popularityLabel}>UK rank #{item.popularity.uk}</Text>
+        <Text style={styles.popularityLabel}>{popularityLabel(item.popularity.uk)}</Text>
       </View>
-
-      <TouchableOpacity style={styles.soundBtn} onPress={() => speak(item.name)}>
-        <Text style={styles.soundBtnText}>🔊 Hear it</Text>
-      </TouchableOpacity>
+      <TouchableOpacity style={styles.soundBtn} onPress={() => speak(item.name)}><Text style={styles.soundBtnText}>🔊 Hear it</Text></TouchableOpacity>
     </Animated.View>
   );
 }
@@ -392,7 +451,6 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
   function set(k: keyof Filters, v: any) {
     onChange({ ...filters, [k]: filters[k] === v ? (k === 'syllables' ? 0 : '') : v });
   }
-
   return (
     <View style={styles.filterPanel}>
       <Text style={styles.filterSection}>Gender</Text>
@@ -403,43 +461,30 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
           ))}
         </View>
       </ScrollView>
-
       <Text style={styles.filterSection}>First letter</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
         <View style={{ flexDirection: 'row', gap: 4, paddingHorizontal: 16 }}>
-          {LETTERS.map(l => (
-            <FilterChip key={l} label={l} active={filters.letter === l} onPress={() => set('letter', l)} />
-          ))}
+          {LETTERS.map(l => <FilterChip key={l} label={l} active={filters.letter === l} onPress={() => set('letter', l)} />)}
         </View>
       </ScrollView>
-
       <Text style={styles.filterSection}>Syllables</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
         <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 16 }}>
-          {[1, 2, 3, 4, 5].map(s => (
-            <FilterChip key={s} label={`${s}`} active={filters.syllables === s} onPress={() => set('syllables', s)} />
-          ))}
+          {[1, 2, 3, 4, 5].map(s => <FilterChip key={s} label={`${s}`} active={filters.syllables === s} onPress={() => set('syllables', s)} />)}
         </View>
       </ScrollView>
-
       <Text style={styles.filterSection}>Vibe</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
         <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 16 }}>
-          {VIBES.map(v => (
-            <FilterChip key={v} label={v} active={filters.vibe === v} onPress={() => set('vibe', v)} />
-          ))}
+          {VIBES.map(v => <FilterChip key={v} label={v} active={filters.vibe === v} onPress={() => set('vibe', v)} />)}
         </View>
       </ScrollView>
-
       <Text style={styles.filterSection}>Origin</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
         <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 16 }}>
-          {ORIGINS.map(o => (
-            <FilterChip key={o} label={o} active={filters.origin === o} onPress={() => set('origin', o)} />
-          ))}
+          {ORIGINS.map(o => <FilterChip key={o} label={o} active={filters.origin === o} onPress={() => set('origin', o)} />)}
         </View>
       </ScrollView>
-
       <Text style={styles.filterSection}>Trend</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
         <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 16 }}>
@@ -454,7 +499,14 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
 
 // ── Browse tab ────────────────────────────────────────────────────────────────
 
-function BrowseTab({ liked, setLiked, tabBarHeight }: { liked: Name[]; setLiked: React.Dispatch<React.SetStateAction<Name[]>>; tabBarHeight: number }) {
+function BrowseTab({
+  liked, setLiked, tabBarHeight, onSwipe,
+}: {
+  liked: Name[];
+  setLiked: React.Dispatch<React.SetStateAction<Name[]>>;
+  tabBarHeight: number;
+  onSwipe: (isLike: boolean) => void;
+}) {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [seen, setSeen] = useState<Set<string>>(new Set());
@@ -483,11 +535,13 @@ function BrowseTab({ liked, setLiked, tabBarHeight }: { liked: Name[]; setLiked:
   function handleLike() {
     if (!current) return;
     setLiked(l => l.find(x => x.name === current.name) ? l : [...l, current]);
+    onSwipe(true);
     advanceSeen(current.name);
   }
 
   function handleSkip() {
     if (!current) return;
+    onSwipe(false);
     advanceSeen(current.name);
   }
 
@@ -500,9 +554,7 @@ function BrowseTab({ liked, setLiked, tabBarHeight }: { liked: Name[]; setLiked:
     <View style={{ flex: 1 }}>
       <View style={styles.filterToggleRow}>
         <TouchableOpacity style={styles.filterToggle} onPress={() => setFiltersOpen(o => !o)}>
-          <Text style={styles.filterToggleText}>
-            {filtersOpen ? '▲' : '▼'} Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-          </Text>
+          <Text style={styles.filterToggleText}>{filtersOpen ? '▲' : '▼'} Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</Text>
         </TouchableOpacity>
         {activeFilterCount > 0 && (
           <TouchableOpacity onPress={() => { setFilters(DEFAULT_FILTERS); setSeen(new Set()); }}>
@@ -510,11 +562,7 @@ function BrowseTab({ liked, setLiked, tabBarHeight }: { liked: Name[]; setLiked:
           </TouchableOpacity>
         )}
       </View>
-
-      {filtersOpen && (
-        <FilterPanel filters={filters} onChange={(f) => { setFilters(f); setSeen(new Set()); setCardKey(k => k + 1); }} />
-      )}
-
+      {filtersOpen && <FilterPanel filters={filters} onChange={(f) => { setFilters(f); setSeen(new Set()); setCardKey(k => k + 1); }} />}
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         {current ? (
           <>
@@ -526,9 +574,7 @@ function BrowseTab({ liked, setLiked, tabBarHeight }: { liked: Name[]; setLiked:
               <TouchableOpacity style={[styles.actionBtn, styles.skipBtn]} onPress={handleSkip}>
                 <Text style={styles.skipBtnText}>✕ Skip</Text>
               </TouchableOpacity>
-              <View style={styles.remainingBadge}>
-                <Text style={styles.remainingText}>{deck.length} left</Text>
-              </View>
+              <View style={styles.remainingBadge}><Text style={styles.remainingText}>{deck.length} left</Text></View>
               <TouchableOpacity style={[styles.actionBtn, styles.likeBtn]} onPress={handleLike}>
                 <Text style={styles.likeBtnText}>♥ Like</Text>
               </TouchableOpacity>
@@ -539,9 +585,7 @@ function BrowseTab({ liked, setLiked, tabBarHeight }: { liked: Name[]; setLiked:
             <Text style={styles.emptyEmoji}>✨</Text>
             <Text style={styles.emptyTitle}>You've seen them all!</Text>
             <Text style={styles.emptySubtitle}>{seen.size} names reviewed</Text>
-            <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
-              <Text style={styles.resetBtnText}>Start over</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={styles.resetBtn} onPress={handleReset}><Text style={styles.resetBtnText}>Start over</Text></TouchableOpacity>
           </View>
         )}
       </View>
@@ -582,32 +626,21 @@ function LikedTab({
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <Text style={styles.likedName}>{item.name}</Text>
-              <View style={[styles.badge, { backgroundColor: genderColor(item.gender) }]}>
-                <Text style={styles.badgeText}>{genderLabel(item.gender)}</Text>
-              </View>
-              <TouchableOpacity onPress={() => speak(item.name)} style={{ marginLeft: 'auto' }}>
-                <Text style={{ fontSize: 18 }}>🔊</Text>
-              </TouchableOpacity>
+              <View style={[styles.badge, { backgroundColor: genderColor(item.gender) }]}><Text style={styles.badgeText}>{genderLabel(item.gender)}</Text></View>
+              <TouchableOpacity onPress={() => speak(item.name)} style={{ marginLeft: 'auto' }}><Text style={{ fontSize: 18 }}>🔊</Text></TouchableOpacity>
             </View>
             <Text style={styles.likedOrigin}>{item.origin} · {item.syllables} syllable{item.syllables !== 1 ? 's' : ''}</Text>
             <Text style={styles.likedMeaning} numberOfLines={2}>{item.meaning}</Text>
             <View style={[styles.badgeRow, { marginTop: 6 }]}>
               {item.vibes.slice(0, 3).map(v => (
-                <View key={v} style={[styles.badge, { backgroundColor: C.peach }]}>
-                  <Text style={[styles.badgeText, { color: C.pink }]}>{v}</Text>
-                </View>
+                <View key={v} style={[styles.badge, { backgroundColor: C.peach }]}><Text style={[styles.badgeText, { color: C.pink }]}>{v}</Text></View>
               ))}
             </View>
-            <TouchableOpacity
-              style={likedStyles.rcBtn}
-              onPress={() => onRealityCheck(item)}
-            >
+            <TouchableOpacity style={likedStyles.rcBtn} onPress={() => onRealityCheck(item)}>
               <Text style={likedStyles.rcBtnText}>🔍 Reality Check</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.removeBtn} onPress={() => remove(item.name)}>
-            <Text style={styles.removeBtnText}>✕</Text>
-          </TouchableOpacity>
+          <TouchableOpacity style={styles.removeBtn} onPress={() => remove(item.name)}><Text style={styles.removeBtnText}>✕</Text></TouchableOpacity>
         </View>
       ))}
     </ScrollView>
@@ -615,10 +648,7 @@ function LikedTab({
 }
 
 const likedStyles = StyleSheet.create({
-  rcBtn: {
-    marginTop: 10, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6,
-    backgroundColor: C.lavender, borderRadius: 14,
-  },
+  rcBtn: { marginTop: 10, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6, backgroundColor: C.lavender, borderRadius: 14 },
   rcBtnText: { fontSize: 12, color: C.purple, fontWeight: '600' },
 });
 
@@ -626,27 +656,22 @@ const likedStyles = StyleSheet.create({
 
 function PartnerTab({ liked }: { liked: Name[] }) {
   const [code] = useState(() => Math.random().toString(36).slice(2, 8).toUpperCase());
-
   return (
     <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'center' }}>
       <Text style={{ fontSize: 48, marginBottom: 16 }}>💑</Text>
       <Text style={styles.partnerTitle}>Partner Mode</Text>
       <Text style={styles.partnerSubtitle}>Coming soon — swipe together and find your shared favourites</Text>
-
       <View style={styles.partnerCodeCard}>
         <Text style={styles.partnerCodeLabel}>Your session code</Text>
         <Text style={styles.partnerCode}>{code}</Text>
         <Text style={styles.partnerCodeHint}>Share this with your partner to sync your lists</Text>
       </View>
-
       {liked.length > 0 && (
         <View style={{ width: '100%', marginTop: 24 }}>
           <Text style={styles.filterSection}>Your picks ({liked.length})</Text>
           {liked.map(n => (
             <View key={n.name} style={[styles.likedCard, { padding: 12 }]}>
-              <View style={[styles.badge, { backgroundColor: genderColor(n.gender), marginRight: 8 }]}>
-                <Text style={styles.badgeText}>{genderLabel(n.gender)}</Text>
-              </View>
+              <View style={[styles.badge, { backgroundColor: genderColor(n.gender), marginRight: 8 }]}><Text style={styles.badgeText}>{genderLabel(n.gender)}</Text></View>
               <Text style={[styles.likedName, { fontSize: 18 }]}>{n.name}</Text>
               <Text style={[styles.likedOrigin, { marginLeft: 8, flex: 1 }]}>{n.origin}</Text>
             </View>
@@ -664,27 +689,40 @@ export default function MainScreen() {
   const [liked, setLiked] = useState<Name[]>([]);
   const [surname, setSurname] = useState('');
   const [realityCheckName, setRealityCheckName] = useState<Name | null>(null);
+  const [showTasteProfile, setShowTasteProfile] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [skipCount, setSkipCount] = useState(0);
   const insets = useSafeAreaInsets();
   const tabBarHeight = 60 + insets.bottom;
+  const totalSwipes = likeCount + skipCount;
+
+  function handleSwipe(isLike: boolean) {
+    if (isLike) setLikeCount(c => c + 1);
+    else setSkipCount(c => c + 1);
+  }
 
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Baby Names</Text>
-        <Text style={styles.headerSub}>Find the perfect name · v6</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View>
+            <Text style={styles.headerTitle}>Baby Names</Text>
+            <Text style={styles.headerSub}>Find the perfect name · v7</Text>
+          </View>
+          {totalSwipes >= 10 && (
+            <TouchableOpacity onPress={() => setShowTasteProfile(true)} style={headerStyles.styleBtn}>
+              <Text style={headerStyles.styleBtnText}>✨ Style</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {totalSwipes > 0 && totalSwipes < 10 && (
+          <Text style={headerStyles.nudge}>Swipe {10 - totalSwipes} more to unlock your style profile</Text>
+        )}
       </View>
 
       <View style={{ flex: 1 }}>
-        {tab === 'browse' && <BrowseTab liked={liked} setLiked={setLiked} tabBarHeight={tabBarHeight} />}
-        {tab === 'liked' && (
-          <LikedTab
-            liked={liked}
-            setLiked={setLiked}
-            surname={surname}
-            setSurname={setSurname}
-            onRealityCheck={setRealityCheckName}
-          />
-        )}
+        {tab === 'browse' && <BrowseTab liked={liked} setLiked={setLiked} tabBarHeight={tabBarHeight} onSwipe={handleSwipe} />}
+        {tab === 'liked' && <LikedTab liked={liked} setLiked={setLiked} surname={surname} setSurname={setSurname} onRealityCheck={setRealityCheckName} />}
         {tab === 'partner' && <PartnerTab liked={liked} />}
       </View>
 
@@ -701,16 +739,20 @@ export default function MainScreen() {
       </View>
 
       {realityCheckName && (
-        <RealityCheckModal
-          name={realityCheckName}
-          surname={surname}
-          onChangeSurname={setSurname}
-          onClose={() => setRealityCheckName(null)}
-        />
+        <RealityCheckModal name={realityCheckName} surname={surname} onChangeSurname={setSurname} onClose={() => setRealityCheckName(null)} />
+      )}
+      {showTasteProfile && (
+        <TasteProfileModal liked={liked} likeCount={likeCount} skipCount={skipCount} onClose={() => setShowTasteProfile(false)} />
       )}
     </View>
   );
 }
+
+const headerStyles = StyleSheet.create({
+  styleBtn: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
+  styleBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  nudge: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 6 },
+});
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -730,11 +772,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, color: C.text },
   chipTextActive: { color: '#fff', fontWeight: '600' },
 
-  card: {
-    width: CARD_W, height: CARD_H, backgroundColor: C.card, borderRadius: 20, padding: 24,
-    shadowColor: '#7C5CBF', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 20,
-    elevation: 8, position: 'absolute', top: 0, justifyContent: 'center',
-  },
+  card: { width: CARD_W, height: CARD_H, backgroundColor: C.card, borderRadius: 20, padding: 24, shadowColor: '#7C5CBF', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 8, position: 'absolute', top: 0, justifyContent: 'center' },
   cardBehind: { top: 10, opacity: 0.45, shadowOpacity: 0, elevation: 2 },
   cardName: { fontSize: 52, fontWeight: '800', color: C.purple, letterSpacing: -1 },
   cardPronounce: { fontSize: 14, color: C.muted, fontStyle: 'italic' },
@@ -772,11 +810,7 @@ const styles = StyleSheet.create({
   resetBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
   likedCount: { fontSize: 13, color: C.muted, fontWeight: '600', marginBottom: 12 },
-  likedCard: {
-    backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 10,
-    flexDirection: 'row', alignItems: 'flex-start',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-  },
+  likedCard: { backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   likedName: { fontSize: 22, fontWeight: '800', color: C.purple },
   likedOrigin: { fontSize: 12, color: C.muted, marginTop: 2 },
   likedMeaning: { fontSize: 13, color: C.text, marginTop: 4, lineHeight: 18 },
