@@ -14,7 +14,7 @@ import namesData from '../data/names.json';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const CARD_W = Math.min(SCREEN_W - 40, 400);
-const CARD_H = Math.min(SCREEN_H * 0.62, 520);
+const CARD_H = Math.min(SCREEN_H * 0.65, 560);
 const SWIPE_THRESHOLD = 100;
 
 const C = {
@@ -336,7 +336,7 @@ function BrowseTab({ liked, setLiked }: { liked: Name[]; setLiked: React.Dispatc
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, flexDirection: 'column' }}>
       {/* Filter toggle */}
       <View style={styles.filterToggleRow}>
         <TouchableOpacity style={styles.filterToggle} onPress={() => setFiltersOpen(o => !o)}>
@@ -355,16 +355,28 @@ function BrowseTab({ liked, setLiked }: { liked: Name[]; setLiked: React.Dispatc
         <FilterPanel filters={filters} onChange={(f) => { setFilters(f); setSeen(new Set()); setCardKey(k => k + 1); }} />
       )}
 
-      {/* Cards area */}
+      {/* Card + buttons — fills all remaining space */}
       <View style={styles.cardArea}>
         {current ? (
-          <View style={{ alignItems: 'center' }}>
-            {/* Shadow card behind */}
-            {next && (
-              <View style={[styles.card, styles.cardBehind]} />
-            )}
-            <NameCard key={cardKey} item={current} onLike={handleLike} onSkip={handleSkip} />
-          </View>
+          <>
+            {/* Explicit-height wrapper so absolute-positioned cards have a parent with size */}
+            <View style={styles.cardStack}>
+              {next && <View style={[styles.card, styles.cardBehind]} />}
+              <NameCard key={cardKey} item={current} onLike={handleLike} onSkip={handleSkip} />
+            </View>
+            {/* Action buttons anchored directly below the card */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={[styles.actionBtn, styles.skipBtn]} onPress={handleSkip}>
+                <Text style={styles.skipBtnText}>✕ Skip</Text>
+              </TouchableOpacity>
+              <View style={styles.remainingBadge}>
+                <Text style={styles.remainingText}>{deck.length} left</Text>
+              </View>
+              <TouchableOpacity style={[styles.actionBtn, styles.likeBtn]} onPress={handleLike}>
+                <Text style={styles.likeBtnText}>♥ Like</Text>
+              </TouchableOpacity>
+            </View>
+          </>
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>✨</Text>
@@ -376,21 +388,6 @@ function BrowseTab({ liked, setLiked }: { liked: Name[]; setLiked: React.Dispatc
           </View>
         )}
       </View>
-
-      {/* Action buttons */}
-      {current && (
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={[styles.actionBtn, styles.skipBtn]} onPress={handleSkip}>
-            <Text style={styles.skipBtnText}>✕ Skip</Text>
-          </TouchableOpacity>
-          <View style={styles.remainingBadge}>
-            <Text style={styles.remainingText}>{deck.length} left</Text>
-          </View>
-          <TouchableOpacity style={[styles.actionBtn, styles.likeBtn]} onPress={handleLike}>
-            <Text style={styles.likeBtnText}>♥ Like</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 }
@@ -536,7 +533,14 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, color: C.text },
   chipTextActive: { color: '#fff', fontWeight: '600' },
 
-  cardArea: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+  cardArea: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingBottom: 8 },
+  cardStack: {
+    width: CARD_W,
+    height: CARD_H + 10,
+    position: 'relative',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   card: {
     width: CARD_W,
     height: CARD_H,
@@ -549,11 +553,12 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 8,
     position: 'absolute',
+    top: 0,
     justifyContent: 'center',
   },
   cardBehind: {
-    top: 8,
-    opacity: 0.5,
+    top: 10,
+    opacity: 0.45,
     shadowOpacity: 0,
     elevation: 2,
   },
