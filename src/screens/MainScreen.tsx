@@ -337,7 +337,7 @@ function BrowseTab({ liked, setLiked, tabBarHeight }: { liked: Name[]; setLiked:
   }
 
   return (
-    <View style={{ flex: 1, paddingBottom: tabBarHeight }}>
+    <View style={{ flex: 1 }}>
       {/* Filter toggle — fixed height */}
       <View style={styles.filterToggleRow}>
         <TouchableOpacity style={styles.filterToggle} onPress={() => setFiltersOpen(o => !o)}>
