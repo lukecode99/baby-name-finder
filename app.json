@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Baby Name Finder",
+    "slug": "baby-name-finder",
+    "version": "1.0.0",
+    "platforms": ["web"],
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "scheme": "babynamefinder"
+  }
+}
