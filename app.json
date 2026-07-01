@@ -15,8 +15,11 @@
     "scheme": "babynamefinder",
     "ios": {
       "bundleIdentifier": "com.lukeholder.babynamefinder",
-      "buildNumber": "1",
-      "supportsTablet": true
+      "buildNumber": "2",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     }
   }
 }
