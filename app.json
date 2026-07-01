@@ -1,14 +1,22 @@
 {
   "expo": {
-    "name": "Baby Name Finder",
+    "name": "Baby Names Finder",
     "slug": "baby-name-finder",
-    "version": "1.0.8",
-    "platforms": ["web"],
+    "version": "1.0.0",
+    "platforms": [
+      "web",
+      "ios"
+    ],
     "web": {
       "bundler": "metro",
       "output": "single",
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "babynamefinder"
+    "scheme": "babynamefinder",
+    "ios": {
+      "bundleIdentifier": "com.lukeholder.babynamefinder",
+      "buildNumber": "1",
+      "supportsTablet": true
+    }
   }
 }
