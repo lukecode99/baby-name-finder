@@ -1,9 +1,10 @@
 import React, { useState, useRef, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, PanResponder, Animated,
-  ScrollView, StyleSheet, Dimensions, Platform,
+  ScrollView, StyleSheet, Dimensions, Platform, Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Speech from 'expo-speech';
 import namesData from '../data/names.json';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -71,11 +72,19 @@ function getSiblingFit(item: Name, siblingName: string): { label: string; color:
 }
 
 function speak(text: string) {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text); u.rate = 0.85;
-    window.speechSynthesis.speak(u);
+  // Web keeps the raw speechSynthesis path (unchanged behaviour); native
+  // goes through expo-speech — the old web-only guard left "Hear it" as a
+  // silent no-op on iOS (BNF-1, App Review 2.1).
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text); u.rate = 0.85;
+      window.speechSynthesis.speak(u);
+    }
+    return;
   }
+  Speech.stop();
+  Speech.speak(text, { rate: 0.85 });
 }
 
 function countSyllables(word: string): number {
@@ -235,9 +244,13 @@ function TasteProfileModal({ liked, likeCount, skipCount, onClose }: { liked: Na
   const profile = useMemo(() => computeStyle(liked), [liked]);
   async function handleShare() {
     const text = `My baby name style is "${profile.title}" ✨\nTop vibes: ${profile.vibes.join(', ')}\nTop origins: ${profile.origins.join(', ')}\n${likeCount} liked · ${skipCount} skipped`;
+    // Web copies to the clipboard; native opens the system share sheet —
+    // the old clipboard-only path did nothing on iOS (BNF-1, 2.1).
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
       try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2500); } catch { }
+      return;
     }
+    try { await Share.share({ message: text }); } catch { }
   }
   return (
     <View style={tp.overlay}>
