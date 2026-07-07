@@ -1,4 +1,5 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import * as Haptics from 'expo-haptics';
 import {
   View, Text, TextInput, TouchableOpacity, PanResponder, Animated,
   ScrollView, StyleSheet, Dimensions, Platform, Share,
@@ -139,6 +140,7 @@ function getStageIndex(liked: Name[], finalists: string[], chosenName: Name | nu
 // ── Celebration Screen ────────────────────────────────────────────────────────
 
 function CelebrationScreen({ name, onClose }: { name: Name; onClose: () => void }) {
+  useEffect(() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }, []);
   return (
     <View style={cel.overlay}>
       <View style={cel.sheet}>
@@ -240,6 +242,7 @@ const set = StyleSheet.create({
 // ── Taste Profile Modal ───────────────────────────────────────────────────────
 
 function TasteProfileModal({ liked, likeCount, skipCount, onClose }: { liked: Name[]; likeCount: number; skipCount: number; onClose: () => void }) {
+  useEffect(() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }, []);
   const [copied, setCopied] = useState(false);
   const profile = useMemo(() => computeStyle(liked), [liked]);
   async function handleShare() {
@@ -401,7 +404,7 @@ function NameCard({ item, onLike, onSkip, siblingFit }: {
     onStartShouldSetPanResponder: () => true,
     onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
     onPanResponderRelease: (_, g) => {
-      if (g.dx > SWIPE_THRESHOLD) Animated.spring(pan, { toValue: { x: SCREEN_W * 1.5, y: g.dy }, useNativeDriver: false }).start(onLike);
+      if (g.dx > SWIPE_THRESHOLD) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); Animated.spring(pan, { toValue: { x: SCREEN_W * 1.5, y: g.dy }, useNativeDriver: false }).start(onLike); }
       else if (g.dx < -SWIPE_THRESHOLD) Animated.spring(pan, { toValue: { x: -SCREEN_W * 1.5, y: g.dy }, useNativeDriver: false }).start(onSkip);
       else Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
     },
